@@ -1,0 +1,14 @@
+1. npm install typescript --save-dev
+
+2. npm install typescript @types/node @types/express @types/cors @types/swagger-ui-express ts-node
+   npm install prisma @prisma/client
+   npm install --save-dev @types/bcrypt @types/jsonwebtoken
+   npm install typescript @types/node @types/express @types/cors @types/swagger-ui-express ts-node 
+   prisma @prisma/client @types/bcrypt @types/jsonwebtoken
+   npm install --save-dev @types/swagger-jsdoc @types/nodemailer
+
+3. tsconfig.json
+
+4. npx prisma init
+
+4. npx ts-node scripts/dbInitializer.ts
