@@ -5,11 +5,13 @@ import Vehicles from './components/Vehicles';
 import ParkingSlots from './components/ParkingSlots';
 import SlotRequests from './components/SlotRequests';
 import ProtectedRoute from './components/ProtectedRoute';
+import SignUp from './pages/Signup';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<SignUp />} />
       <Route
         path="/dashboard"
         element={
