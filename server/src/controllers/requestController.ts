@@ -213,8 +213,15 @@ export const approveRequest = async (req: AuthRequest, res: Response): Promise<v
     });
 
     if (request.user?.email) {
-      await sendApprovalEmail(request.user.email, slot.slotNumber);
+      const emailStatus = await sendApprovalEmail(request.user.email, slot.slotNumber);
+      if (emailStatus === 'failed') {
+        console.error(`Failed to send approval email for request ${id}`);
+        await prisma.log.create({
+          data: { userId, action: `Failed to send approval email for request ${id}` },
+        });
+      }
     }
+    
     await prisma.log.create({
       data: { userId, action: `Slot request ${id} approved for slot ${slot.slotNumber}` },
     });
@@ -246,8 +253,14 @@ export const rejectRequest = async (req: AuthRequest, res: Response): Promise<vo
       data: { requestStatus: 'rejected' },
     });
 
-    if (reason && request.user?.email) {
-      await sendRejectionEmail(request.user.email, reason);
+    if (request.user?.email) {
+      const emailStatus = await sendRejectionEmail(request.user.email, reason || 'No reason provided');
+      if (emailStatus === 'failed') {
+        console.error(`Failed to send rejection email for request ${id}`);
+        await prisma.log.create({
+          data: { userId, action: `Failed to send rejection email for request ${id}` },
+        });
+      }
     }
 
     await prisma.log.create({

@@ -20,10 +20,10 @@ const router = Router();
  *             type: object
  *             required: [plate_number, vehicle_type, size]
  *             properties:
- *               plate_number: { type: string }
- *               vehicle_type: { type: string }
+ *               plateNumber: { type: string }
+ *               vehicleType: { type: string }
  *               size: { type: string }
- *               other_attributes: { type: object }
+ *               otherAttributes: { type: object }
  *     responses:
  *       201: { description: Vehicle created }
  *       400: { description: Plate number exists }

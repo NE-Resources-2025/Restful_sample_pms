@@ -11,8 +11,25 @@ export const createVehicle = async (req: AuthRequest, res: Response): Promise<vo
   const userId = req.user?.id;
   const { plateNumber, vehicleType, size, otherAttributes } = req.body;
 
-  if (typeof userId !== 'number') {
-    res.status(400).json({ error: 'User ID is required' });
+  if (!userId || typeof userId !== 'number') {
+    res.status(401).json({ error: 'Unauthorized: Missing or invalid token' });
+    return;
+  }
+
+  if (!plateNumber || typeof plateNumber !== 'string') {
+    res.status(400).json({ error: 'Plate number is required and must be a string' });
+    return;
+  }
+  if (!vehicleType || !['car', 'truck', 'motorcycle'].includes(vehicleType)) {
+    res.status(400).json({ error: 'Vehicle type is required and must be one of: car, truck, motorcycle' });
+    return;
+  }
+  if (!size || !['small', 'medium', 'large'].includes(size)) {
+    res.status(400).json({ error: 'Size is required and must be one of: small, medium, large' });
+    return;
+  }
+  if (otherAttributes && typeof otherAttributes !== 'object') {
+    res.status(400).json({ error: 'Other attributes must be a valid JSON object' });
     return;
   }
 
@@ -25,6 +42,7 @@ export const createVehicle = async (req: AuthRequest, res: Response): Promise<vo
         size,
         otherAttributes: otherAttributes || {},
       },
+      include: { user: { select: { email: true } } },
     });
 
     await prisma.log.create({
@@ -36,7 +54,14 @@ export const createVehicle = async (req: AuthRequest, res: Response): Promise<vo
 
     res.status(201).json(vehicle);
   } catch (error) {
-    res.status(400).json({ error: 'Plate number already exists or server error' });
+    console.error('Create vehicle error:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      res.status(400).json({ error: `Vehicle with plate number ${plateNumber} already exists` });
+    } else if (error instanceof Prisma.PrismaClientValidationError) {
+      res.status(400).json({ error: 'Invalid input data' });
+    } else {
+      res.status(500).json({ error: 'Server error' });
+    }
   }
 };
 
