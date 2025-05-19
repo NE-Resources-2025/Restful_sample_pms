@@ -17,7 +17,7 @@ export default function Dashboard() {
 
     const fetchData = async () => {
       try {
-        console.log('Fetching data with token:', localStorage.getItem('token'));
+        // console.log('Fetching data with token:', localStorage.getItem('token')); //debugging
         const [users, vehicles, slots, requests] = await Promise.all([
           getUsers({ page: 1, limit: 1 }).catch(err => {
             console.log('getUsers failed:', err.response?.data || err.message);
@@ -148,41 +148,49 @@ export default function Dashboard() {
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Vehicle
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Slot
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center">
-                      <FaCalendarAlt className="mr-1" />
-                      Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {recentRequests.map((req) => (
-                    <tr key={req.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {req.vehicle?.plateNumber || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {req.slotNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <StatusBadge status={req.requestStatus} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(req.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+              <thead className="bg-gray-50">
+  <tr>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      User Email
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Vehicle
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Slot
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Status
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center">
+        <FaCalendarAlt className="mr-1" />
+        Date
+      </div>
+    </th>
+  </tr>
+</thead>
+<tbody className="bg-white divide-y divide-gray-200">
+  {recentRequests.map((req) => (
+    <tr key={req.id} className="hover:bg-gray-50 transition-colors">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        {req.user?.email || 'N/A'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        {req.vehicle?.plateNumber || 'N/A'} ({req.vehicle?.vehicleType || 'N/A'})
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {req.slotNumber || 'Not Assigned'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm">
+        <StatusBadge status={req.requestStatus} />
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'N/A'}
+      </td>
+    </tr>
+  ))}
+</tbody>
               </table>
             </div>
           )}

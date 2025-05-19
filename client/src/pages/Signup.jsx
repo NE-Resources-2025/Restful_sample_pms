@@ -51,7 +51,7 @@ export default function SignUp() {
         email: formData.email,
         password: formData.password,
       });
-      navigate("/verify-otp", { state: { userId, email: formData.email } });
+      navigate("/dashboard", { state: { userId, email: formData.email } });
     } catch (error) {
       const errorMsg = error.response?.data?.error || "Sign-up failed. Please try again.";
       setErrors((prev) => ({ ...prev, api: errorMsg }));

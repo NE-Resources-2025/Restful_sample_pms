@@ -2,13 +2,26 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from '../services/api';
 import ErrorMessage from '../utils/error-msg';
-import { FaCar, FaSignInAlt, FaUserPlus } from 'react-icons/fa';
+import { FaCar, FaSignInAlt, FaUserPlus, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [errors, setErrors] = useState({ email: '', password: '', api: '' });
+
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+  });
+
+  const [errors, setErrors] = useState({
+    name: "",
+    email: "",
+    password: "",
+    api: "",
+  });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -17,20 +30,46 @@ export default function Login() {
     }
   }, [navigate]);
 
+  const checkPasswordStrength = (password) => {
+    if (password.length < 6) {
+      return { isValid: false, error: 'Password must be at least 6 characters long' };
+    }
+    return { isValid: true, error: '' };
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    setErrors({ ...errors, [name]: '', api: '' });
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    setErrors((prev) => ({ ...prev, [name]: "", api: "" }));
+
+    if (name === "password") {
+      const { isValid, error } = checkPasswordStrength(value);
+      setErrors((prev) => ({ ...prev, password: isValid ? "" : error }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+
+    const { isValid, error } = checkPasswordStrength(formData.password);
+    if (!isValid) {
+      setErrors((prev) => ({ ...prev, password: error }));
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await login(formData);
       navigate('/dashboard');
     } catch (error) {
-      setErrors({ ...errors, api: error.response?.data?.error || 'Login failed' });
+      setErrors((prev) => ({
+        ...prev,
+        api: error.response?.data?.error || 'Login failed',
+      }));
     } finally {
       setIsLoading(false);
     }
@@ -55,10 +94,10 @@ export default function Login() {
 
       {/* Right Panel - Login Form */}
       <div className="w-full md:w-3/5 bg-white rounded-t-3xl md:rounded-l-3xl md:rounded-tr-none p-8 md:p-12 flex flex-col justify-center relative overflow-hidden">
-        {/* Decorative elements */}
+        {/* Decorative Elements */}
         <div className="absolute -bottom-20 -right-20 w-64 h-64 rounded-full bg-green-100 opacity-20"></div>
         <div className="absolute -top-20 -left-20 w-40 h-40 rounded-full bg-amber-100 opacity-20"></div>
-        
+
         <div className="max-w-md mx-auto w-full relative z-10">
           <div className="text-center mb-10">
             <h1 className="text-3xl font-bold text-green-800 flex items-center justify-center">
@@ -66,8 +105,28 @@ export default function Login() {
             </h1>
             <p className="text-gray-500 mt-2">Sign in to manage your parking system</p>
           </div>
-          
+
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* Optional Name Input */}
+            {/* 
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-600 mb-1">
+                Name
+              </label>
+              <input
+                type="text"
+                name="name"
+                id="name"
+                value={formData.name}
+                onChange={handleChange}
+                className="text-sm w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                placeholder="Your Name"
+              />
+              <ErrorMessage message={errors.name} />
+            </div>
+            */}
+
+            {/* Email */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-600 mb-1">
                 Email Address
@@ -80,7 +139,8 @@ export default function Login() {
                   value={formData.email}
                   onChange={handleChange}
                   className={`text-sm w-full px-4 py-3 pl-10 border outline-none ${
-                    errors.email ? 'border-red-300' : 'border-gray-300'}`}
+                    errors.email ? 'border-red-300' : 'border-gray-300'
+                  } rounded-lg`}
                   placeholder="your@email.com"
                   required
                 />
@@ -94,35 +154,39 @@ export default function Login() {
               <ErrorMessage message={errors.email} />
             </div>
 
+            {/* Password */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-600 mb-1">
                 Password
               </label>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   id="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className={`text-sm w-full px-4 py-3 pl-10 border outline-none ${
-                    errors.password ? 'border-red-300' : 'border-gray-300'}`}
                   placeholder="••••••••"
+                  className={`text-sm w-full px-4 py-3 pl-10 border ${
+                    errors.password ? 'border-red-300' : 'border-gray-300'
+                  } rounded-lg outline-none transition bg-white`}
                   required
                 />
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <FaLock className="h-5 w-5 text-gray-400" />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <FaEye className="h-5 w-5" /> : <FaEyeSlash className="h-5 w-5" />}
+                </button>
               </div>
               <ErrorMessage message={errors.password} />
             </div>
 
+            {/* Remember Me + Forgot Password */}
             <div className="flex items-center justify-between">
               <div className="flex items-center">
                 <input
@@ -144,6 +208,7 @@ export default function Login() {
 
             <ErrorMessage message={errors.api} />
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -153,23 +218,16 @@ export default function Login() {
                   : 'bg-green-600 hover:bg-green-700 text-white'
               }`}
             >
-              {isLoading ? (
-                'Signing in...'
-              ) : (
-                <>
-                  Sign In
-                </>
-              )}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
+          {/* Sign up link */}
           <div className="mt-8 text-center">
             <p className="text-sm text-gray-500">
               New to RRA PMS?{' '}
-              <Link
-                to="/signup"
-                className="font-medium text-green-600 hover:text-green-500 inline-flex items-center"
-              >
+              <Link to="/signup" className="font-medium text-green-600 hover:text-green-500 inline-flex items-center">
+                <FaUserPlus className="mr-1" />
                 Sign up
               </Link>
             </p>

@@ -21,6 +21,9 @@ const router = Router();
  *             required: [vehicleId]
  *             properties:
  *               vehicleId: { type: integer }
+ *               preferredVehicleType: { type: string }
+ *               preferredSize: { type: string }
+ *               preferredSlotNumber: { type: string }
  *     responses:
  *       201: { description: Slot request created }
  *       401: { description: Unauthorized }
@@ -139,7 +142,7 @@ router.delete('/:id', authenticate, deleteRequest);
 /**
  * @swagger
  * /api/slot-requests/{id}/approve:
- *   post:
+ *   put:
  *     summary: Approve a slot request (admin only)
  *     tags: [Slot Requests]
  *     security:
@@ -159,12 +162,12 @@ router.delete('/:id', authenticate, deleteRequest);
  *       404: { description: Request not found }
  *       500: { description: Server error }
  */
-router.post('/:id/approve', authenticate, isAdmin, approveRequest);
+router.put('/:id/approve', authenticate, isAdmin, approveRequest);
 
 /**
  * @swagger
  * /api/slot-requests/{id}/reject:
- *   post:
+ *   put:
  *     summary: Reject a slot request (admin only)
  *     tags: [Slot Requests]
  *     security:
@@ -193,6 +196,6 @@ router.post('/:id/approve', authenticate, isAdmin, approveRequest);
  *       404: { description: Request not found }
  *       500: { description: Server error }
  */
-router.post('/:id/reject', authenticate, isAdmin, rejectRequest);
+router.put('/:id/reject', authenticate, isAdmin, rejectRequest);
 
 export default router;

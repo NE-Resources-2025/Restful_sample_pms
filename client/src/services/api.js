@@ -11,7 +11,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
-    console.log(`Request to ${config.url}:`, { token, headers: config.headers });
+    // console.log(`Request to ${config.url}:`, { token, headers: config.headers }); //debugging
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
@@ -113,7 +113,9 @@ export const approveSlotRequest = async (id) => {
     return response.data.data;
 };
 
-export const rejectSlotRequest = async (id) => {
-    const response = await api.put(`/slot-requests/${id}/reject`);
+export const rejectSlotRequest = async (id, reason) => {
+    const response = await api.put(`/slot-requests/${id}/reject`, { reason });
     return response.data.data;
-};
+  };
+
+

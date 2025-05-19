@@ -8,6 +8,7 @@ interface AuthRequest extends Request {
   user?: { id: number; role: string };
 }
 
+// Create a slot request
 export const createRequest = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.id;
   const { vehicleId } = req.body;
@@ -34,13 +35,14 @@ export const createRequest = async (req: AuthRequest, res: Response): Promise<vo
       data: { userId, action: `Slot request ${request.id} created for vehicle ${vehicle.plateNumber}` },
     });
 
-    res.status(201).json(request);
+    res.status(201).json({ data: request });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
+// Get slot requests
 export const getRequests = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.id;
   const isAdmin = req.user?.role === 'admin';
@@ -48,34 +50,43 @@ export const getRequests = async (req: AuthRequest, res: Response): Promise<void
   const pageNum = parseInt(page as string, 10);
   const limitNum = parseInt(limit as string, 10);
   const skip = (pageNum - 1) * limitNum;
-  const searchQuery = `%${search}%`;
+  const searchQuery = search as string;
 
   try {
     const where = isAdmin
       ? {
           OR: [
-            { vehicle: { plateNumber: { contains: search as string, mode: 'insensitive' as const } } },
-            { vehicle: { vehicleType: { contains: search as string, mode: 'insensitive' as const } } },
+            { vehicle: { plateNumber: { contains: searchQuery, mode: 'insensitive' as const } } },
+            { vehicle: { vehicleType: { contains: searchQuery, mode: 'insensitive' as const } } },
+            { slot: { slotNumber: { contains: searchQuery, mode: 'insensitive' as const } } },
           ],
         }
       : {
           userId,
           OR: [
-            { vehicle: { plateNumber: { contains: search as string, mode: 'insensitive' as const } } },
-            { vehicle: { vehicleType: { contains: search as string, mode: 'insensitive' as const } } },
+            { vehicle: { plateNumber: { contains: searchQuery, mode: 'insensitive' as const } } },
+            { vehicle: { vehicleType: { contains: searchQuery, mode: 'insensitive' as const } } },
+            { slot: { slotNumber: { contains: searchQuery, mode: 'insensitive' as const } } },
           ],
         };
 
     const [requests, totalItems] = await Promise.all([
       prisma.slotRequest.findMany({
-        where,
-        skip,
-        take: limitNum,
-        orderBy: { id: 'asc' },
-        include: {
-          vehicle: { select: { plateNumber: true, vehicleType: true } },
-          user: { select: { email: true } },
+      where,
+      skip,
+      take: limitNum,
+      orderBy: { id: 'asc' },
+      include: {
+        vehicle: {
+        select: { plateNumber: true, vehicleType: true, size: true },
         },
+        user: {
+        select: { email: true },
+        },
+        slot: {
+        select: { slotNumber: true, status: true },
+        }
+      },
       }),
       prisma.slotRequest.count({ where }),
     ]);
@@ -85,11 +96,7 @@ export const getRequests = async (req: AuthRequest, res: Response): Promise<void
     });
 
     res.json({
-      data: requests.map(r => ({
-        ...r,
-        plateNumber: r.vehicle.plateNumber,
-        vehicleType: r.vehicle.vehicleType,
-      })),
+      data: requests,
       meta: {
         totalItems,
         currentPage: pageNum,
@@ -103,6 +110,7 @@ export const getRequests = async (req: AuthRequest, res: Response): Promise<void
   }
 };
 
+// Update a slot request
 export const updateRequest = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.id;
   const { id } = req.params;
@@ -131,13 +139,14 @@ export const updateRequest = async (req: AuthRequest, res: Response): Promise<vo
       data: { userId, action: `Slot request ${id} updated` },
     });
 
-    res.json(updatedRequest);
+    res.json({ data: updatedRequest });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
+// Delete a slot request
 export const deleteRequest = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.id;
   const { id } = req.params;
@@ -155,13 +164,14 @@ export const deleteRequest = async (req: AuthRequest, res: Response): Promise<vo
       data: { userId, action: `Slot request ${id} deleted` },
     });
 
-    res.json({ message: 'Request deleted' });
+    res.json({ data: { message: 'Request deleted' } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
+// Approve a slot request
 export const approveRequest = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.id;
   const { id } = req.params;
@@ -202,22 +212,25 @@ export const approveRequest = async (req: AuthRequest, res: Response): Promise<v
       data: { status: 'occupied' },
     });
 
-    const emailStatus = await sendApprovalEmail(request.user.email, slot.slotNumber);
+    if (request.user?.email) {
+      await sendApprovalEmail(request.user.email, slot.slotNumber);
+    }
     await prisma.log.create({
       data: { userId, action: `Slot request ${id} approved for slot ${slot.slotNumber}` },
     });
 
-    res.json({ message: 'Request approved', slot, emailStatus });
+    res.json({ data: updatedRequest });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });
   }
 };
 
+// Reject a slot request
 export const rejectRequest = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.id;
   const { id } = req.params;
-  const { reason } = req.body;
+  const { reason } = req.body; // Optional
   try {
     const request = await prisma.slotRequest.findFirst({
       where: { id: parseInt(id, 10), requestStatus: 'pending' },
@@ -228,22 +241,20 @@ export const rejectRequest = async (req: AuthRequest, res: Response): Promise<vo
       return;
     }
 
-    if (!reason) {
-      res.status(400).json({ error: 'Rejection reason required' });
-      return;
-    }
-
     const updatedRequest = await prisma.slotRequest.update({
       where: { id: parseInt(id, 10) },
       data: { requestStatus: 'rejected' },
     });
 
-    const emailStatus = await sendRejectionEmail(request.user.email, reason);
+    if (reason && request.user?.email) {
+      await sendRejectionEmail(request.user.email, reason);
+    }
+
     await prisma.log.create({
-      data: { userId, action: `Slot request ${id} rejected` },
+      data: { userId, action: `Slot request ${id} rejected${reason ? ` with reason: ${reason}` : ''}` },
     });
 
-    res.json({ message: 'Request rejected', request: updatedRequest, emailStatus });
+    res.json({ data: updatedRequest });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Server error' });

@@ -8,11 +8,13 @@ import vehicleRoutes from "./routes/vehicleRoutes";
 import slotRoutes from "./routes/slotRoutes";
 import requestRoutes from "./routes/requestRoutes";
 import logRoutes from "./routes/logRoutes";
+import morgan from 'morgan';
 
 const app: Express = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(morgan('dev')); // logging
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use('/api/auth', authRoutes);

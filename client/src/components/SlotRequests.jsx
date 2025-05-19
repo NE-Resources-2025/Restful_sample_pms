@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import Navbar from './Navbar';
 import { getSlotRequests, approveSlotRequest, rejectSlotRequest } from '../services/api';
 import ErrorMessage from '../utils/error-msg';
-import { FaSearch, FaCheck, FaTimes, FaCalendarAlt, FaCar, FaParking, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaUser ,FaSearch, FaCheck, FaTimes, FaCalendarAlt, FaCar, FaParking, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { IoMdCheckmarkCircle, IoMdCloseCircle, IoMdTime } from 'react-icons/io';
+
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { ToastContainer } from 'react-toastify';
 
 export default function SlotRequests() {
   const [requests, setRequests] = useState([]);
@@ -13,7 +17,7 @@ export default function SlotRequests() {
 
   useEffect(() => {
     let isMounted = true;
-
+  
     const fetchRequests = async () => {
       try {
         const response = await getSlotRequests({
@@ -21,7 +25,6 @@ export default function SlotRequests() {
           limit: pagination.limit,
           search,
         });
-        console.log('API Response:', response); // Debugging log
         const { data, pagination: pag } = response;
         if (isMounted) {
           setRequests(data || []);
@@ -29,7 +32,7 @@ export default function SlotRequests() {
           setErrors({ api: '' });
         }
       } catch (error) {
-        console.error('API Error:', error); // Debug log
+        console.error('API Error:', error);
         if (isMounted) {
           setErrors({ api: error.response?.data?.error || 'Failed to load requests' });
           setPagination({ page: 1, limit: 10, total: 0, pages: 1 });
@@ -37,42 +40,41 @@ export default function SlotRequests() {
         }
       }
     };
-
+  
     fetchRequests();
     return () => {
       isMounted = false;
     };
-  }, [pagination, search]);
+  }, [pagination.page, search]); // Only depend on page and search
 
   const handleApprove = async (id) => {
     try {
-      await approveSlotRequest(id);
+      const updatedRequest = await approveSlotRequest(id);
+      setRequests(requests.map((req) =>
+        req.id === id
+          ? { ...req, requestStatus: updatedRequest.requestStatus, slotNumber: updatedRequest.slotNumber }
+          : req
+      ));
       setErrors({ api: '' });
-      const { data, pagination: pag } = await getSlotRequests({
-        page: pagination.page,
-        limit: pagination.limit,
-        search,
-      });
-      setRequests(data || []);
-      setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+      toast.success('Request approved successfully');
     } catch (error) {
       setErrors({ api: error.response?.data?.error || 'Failed to approve request' });
+      toast.error(error.response?.data?.error || 'Failed to approve request');
     }
   };
-
+  
   const handleReject = async (id) => {
+    const reason = prompt('Please provide a reason for rejection:') || 'No reason provided';
     try {
-      await rejectSlotRequest(id);
+      const updatedRequest = await rejectSlotRequest(id, reason);
+      setRequests(requests.map((req) =>
+        req.id === id ? { ...req, requestStatus: updatedRequest.requestStatus } : req
+      ));
       setErrors({ api: '' });
-      const { data, pagination: pag } = await getSlotRequests({
-        page: pagination.page,
-        limit: pagination.limit,
-        search,
-      });
-      setRequests(data || []);
-      setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+      toast.success('Request rejected successfully');
     } catch (error) {
       setErrors({ api: error.response?.data?.error || 'Failed to reject request' });
+      toast.error(error.response?.data?.error || 'Failed to reject request');
     }
   };
 
@@ -107,6 +109,7 @@ export default function SlotRequests() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
         <div className="mb-8 border-b border-gray-200 pb-4">
@@ -144,71 +147,80 @@ export default function SlotRequests() {
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FaCar className="mr-2" />
-                        Vehicle
-                      </div>
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FaParking className="mr-2" />
-                        Slot
-                      </div>
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      <div className="flex items-center">
-                        <FaCalendarAlt className="mr-2" />
-                        Date
-                      </div>
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {requests.map((r) => (
-                    <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {r.vehicle?.plateNumber || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {r.slotNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <StatusBadge status={r.requestStatus} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(r.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {r.requestStatus === 'pending' && (
-                          <div className="flex justify-end space-x-2">
-                            <button
-                              onClick={() => handleApprove(r.id)}
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                            >
-                              <FaCheck className="mr-1" />
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleReject(r.id)}
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                            >
-                              <FaTimes className="mr-1" />
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+  <tr>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center">
+        <FaUser className="mr-2" />
+        User Email
+      </div>
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center">
+        <FaCar className="mr-2" />
+        Vehicle
+      </div>
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center">
+        <FaParking className="mr-2" />
+        Slot
+      </div>
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Status
+    </th>
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="flex items-center">
+        <FaCalendarAlt className="mr-2" />
+        Date
+      </div>
+    </th>
+    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+      Actions
+    </th>
+  </tr>
+</thead>
+<tbody className="bg-white divide-y divide-gray-200">
+  {requests.map((r) => (
+    <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        {r.user?.email || 'N/A'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        {r.vehicle?.plateNumber || 'N/A'} ({r.vehicle?.vehicleType || 'N/A'})
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {r.slotNumber || 'Not Assigned'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm">
+        <StatusBadge status={r.requestStatus} />
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'N/A'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        {r.requestStatus === 'pending' && (
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={() => handleApprove(r.id)}
+              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              <FaCheck className="mr-1" />
+              Approve
+            </button>
+            <button
+              onClick={() => handleReject(r.id)}
+              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              <FaTimes className="mr-1" />
+              Reject
+            </button>
+          </div>
+        )}
+      </td>
+    </tr>
+  ))}
+</tbody>
               </table>
             </div>
           )}

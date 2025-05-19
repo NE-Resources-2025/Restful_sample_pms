@@ -5,7 +5,7 @@ const ErrorMessage = ({ message }) => {
   if (!message) return null;
 
   return (
-      <p className="flex flex-center text-error-red text-xs mt-1 font-medium gap-1">
+      <p className="flex flex-center text-red-600 text-xs mt-1 font-medium gap-1">
           <GoAlertFill className="text-lg" />
           {message}
     </p>

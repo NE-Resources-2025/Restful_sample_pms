@@ -53,6 +53,7 @@ model SlotRequest {
   slotNumber    String?
   requestStatus String       @default("pending")
   approvedAt    DateTime?
+  createdAt     DateTime     @default(now()) // Add this
 }
 
 model Log {
