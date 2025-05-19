@@ -1,8 +1,10 @@
-import { FaCar, FaEdit, FaTrash, FaSearch, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import { useState, useEffect } from 'react';
+import { FaCar, FaEdit, FaTrash, FaSearch, FaChevronLeft, FaChevronRight, FaTimes } from 'react-icons/fa';
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-toastify';
 import Navbar from './Navbar';
 import { getVehicles, updateVehicle, deleteVehicle } from '../services/api';
 import ErrorMessage from '../utils/error-msg';
+import { sanitizeSearchInput, sanitizeSearchQuery } from '../utils/sanitization';
 
 export default function Vehicles() {
   const [vehicles, setVehicles] = useState([]);
@@ -11,56 +13,67 @@ export default function Vehicles() {
   const [editVehicle, setEditVehicle] = useState(null);
   const [errors, setErrors] = useState({ api: '' });
 
+  const fetchVehicles = useCallback(async (query = '') => {
+    try {
+      const { sanitized, isValid } = sanitizeSearchQuery(query);
+      if (!isValid && query) {
+        toast.error('Invalid search query');
+        return;
+      }
+      const { data, pagination: pag } = await getVehicles({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: sanitized,
+      });
+      setVehicles(data || []);
+      setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+      setErrors({ api: '' });
+      if (!data?.length && sanitized) {
+        toast.info('No vehicles found for your search');
+      }
+    } catch (error) {
+      setErrors({ api: error.response?.data?.error || 'Failed to load vehicles' });
+      setPagination({ page: 1, limit: 10, total: 0, pages: 1 });
+      setVehicles([]);
+    }
+  }, [pagination.page, pagination.limit]);
+
   useEffect(() => {
     let isMounted = true;
-
-    const fetchVehicles = async () => {
-      try {
-        const { data, pagination: pag } = await getVehicles({
-          page: pagination.page,
-          limit: pagination.limit,
-          search,
-        });
-        if (isMounted) {
-          setVehicles(data || []);
-          setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
-          setErrors({ api: '' });
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrors({ api: error.response?.data?.error || 'Failed to load vehicles' });
-          setPagination({ page: 1, limit: 10, total: 0, pages: 1 });
-          setVehicles([]);
-        }
-      }
-    };
-
-    fetchVehicles();
+    const timeout = setTimeout(() => {
+      if (isMounted) fetchVehicles(search);
+    }, 300);
     return () => {
       isMounted = false;
+      clearTimeout(timeout);
     };
-  }, [pagination, search]);
+  }, [fetchVehicles, search]);
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+  };
+
+  const clearSearch = () => {
+    setSearch('');
+    fetchVehicles('');
+  };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
       await updateVehicle(editVehicle.id, {
-        plateNumber: editVehicle.plateNumber,
+        plateNumber: sanitizeSearchInput(editVehicle.plateNumber),
         vehicleType: editVehicle.vehicleType,
         size: editVehicle.size,
         otherAttributes: editVehicle.otherAttributes,
       });
       setEditVehicle(null);
       setErrors({ api: '' });
-      const { data, pagination: pag } = await getVehicles({
-        page: pagination.page,
-        limit: pagination.limit,
-        search,
-      });
-      setVehicles(data || []);
-      setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+      fetchVehicles(search);
+      toast.success('Vehicle updated successfully');
     } catch (error) {
       setErrors({ api: error.response?.data?.error || 'Failed to update vehicle' });
+      toast.error(error.response?.data?.error || 'Failed to update vehicle');
     }
   };
 
@@ -69,15 +82,11 @@ export default function Vehicles() {
       try {
         await deleteVehicle(id);
         setErrors({ api: '' });
-        const { data, pagination: pag } = await getVehicles({
-          page: pagination.page,
-          limit: pagination.limit,
-          search,
-        });
-        setVehicles(data || []);
-        setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+        fetchVehicles(search);
+        toast.success('Vehicle deleted successfully');
       } catch (error) {
         setErrors({ api: error.response?.data?.error || 'Failed to delete vehicle' });
+        toast.error(error.response?.data?.error || 'Failed to delete vehicle');
       }
     }
   };
@@ -86,7 +95,6 @@ export default function Vehicles() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
         <div className="mb-8 border-b border-gray-200 pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div className="mb-4 sm:mb-0">
@@ -98,7 +106,7 @@ export default function Vehicles() {
                 View and manage all registered vehicles
               </p>
             </div>
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-64 flex items-center">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <FaSearch className="text-gray-400" />
               </div>
@@ -106,16 +114,23 @@ export default function Vehicles() {
                 type="text"
                 placeholder="Search vehicles..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                onChange={handleSearch}
+                className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
+              {search && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-0 inset-y-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <FaTimes />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         <ErrorMessage message={errors.api} />
 
-        {/* Vehicles Table */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200">
           {vehicles.length === 0 ? (
             <div className="px-4 py-12 text-center">
@@ -176,7 +191,6 @@ export default function Vehicles() {
           )}
         </div>
 
-        {/* Pagination */}
         <div className="flex items-center justify-between mt-6 px-4">
           <div className="flex-1 flex justify-between sm:hidden">
             <button
@@ -227,7 +241,6 @@ export default function Vehicles() {
           </div>
         </div>
 
-        {/* Edit Vehicle Modal */}
         {editVehicle && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl overflow-hidden w-full max-w-md mx-4">

@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'react-toastify';
 import Navbar from './Navbar';
 import { getParkingSlots, createBulkParkingSlots, updateParkingSlot, deleteParkingSlot } from '../services/api';
 import ErrorMessage from '../utils/error-msg';
-import { FaParking, FaPlus, FaSearch, FaEdit, FaTrash, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaParking, FaPlus, FaSearch, FaEdit, FaTrash, FaChevronLeft, FaChevronRight, FaTimes } from 'react-icons/fa';
+import { sanitizeSearchInput, sanitizeSearchQuery } from '../utils/sanitization';
 
 export default function ParkingSlots() {
   const [slots, setSlots] = useState([]);
@@ -12,54 +14,69 @@ export default function ParkingSlots() {
   const [editSlot, setEditSlot] = useState(null);
   const [errors, setErrors] = useState({ api: '' });
 
+  const fetchSlots = useCallback(async (query = '') => {
+    try {
+      const { sanitized, isValid } = sanitizeSearchQuery(query);
+      if (!isValid && query) {
+        toast.error('Invalid search query');
+        return;
+      }
+      const response = await getParkingSlots({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: sanitized,
+      });
+      const { data, pagination: pag } = response;
+      setSlots(data || []);
+      setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+      setErrors({ api: '' });
+      if (!data?.length && sanitized) {
+        toast.info('No parking slots found for your search');
+      }
+    } catch (error) {
+      console.error('API Error:', error);
+      setErrors({ api: error.response?.data?.error || 'Failed to load slots' });
+      setPagination({ page: 1, limit: 10, total: 0, pages: 1 });
+      setSlots([]);
+    }
+  }, [pagination.page, pagination.limit]);
+
   useEffect(() => {
     let isMounted = true;
-
-    const fetchSlots = async () => {
-      try {
-        const response = await getParkingSlots({
-          page: pagination.page,
-          limit: pagination.limit,
-          search,
-        });
-        console.log('API Response:', response); // Debugging log
-        const { data, pagination: pag } = response;
-        if (isMounted) {
-          setSlots(data || []);
-          setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
-          setErrors({ api: '' });
-        }
-      } catch (error) {
-        console.error('API Error:', error); // Debugging log
-        if (isMounted) {
-          setErrors({ api: error.response?.data?.error || 'Failed to load slots' });
-          setPagination({ page: 1, limit: 10, total: 0, pages: 1 });
-          setSlots([]);
-        }
-      }
-    };
-
-    fetchSlots();
+    const timeout = setTimeout(() => {
+      if (isMounted) fetchSlots(search);
+    }, 300);
     return () => {
       isMounted = false;
+      clearTimeout(timeout);
     };
-  }, [pagination, search]);
+  }, [fetchSlots, search]);
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+  };
+
+  const clearSearch = () => {
+    setSearch('');
+    fetchSlots('');
+  };
 
   const handleBulkSubmit = async (e) => {
     e.preventDefault();
     try {
-      await createBulkParkingSlots(slotForm);
+      const sanitizedForm = slotForm.map(slot => ({
+        ...slot,
+        slotNumber: sanitizeSearchInput(slot.slotNumber),
+        location: sanitizeSearchInput(slot.location),
+      }));
+      await createBulkParkingSlots(sanitizedForm);
       setSlotForm([]);
       setErrors({ api: '' });
-      const { data, pagination: pag } = await getParkingSlots({
-        page: pagination.page,
-        limit: pagination.limit,
-        search,
-      });
-      setSlots(data || []);
-      setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+      fetchSlots(search);
+      toast.success('Slots created successfully');
     } catch (error) {
       setErrors({ api: error.response?.data?.error || 'Failed to create slots' });
+      toast.error(error.response?.data?.error || 'Failed to create slots');
     }
   };
 
@@ -67,23 +84,19 @@ export default function ParkingSlots() {
     e.preventDefault();
     try {
       await updateParkingSlot(editSlot.id, {
-        slotNumber: editSlot.slotNumber,
+        slotNumber: sanitizeSearchInput(editSlot.slotNumber),
         size: editSlot.size,
         vehicleType: editSlot.vehicleType,
-        location: editSlot.location,
+        location: sanitizeSearchInput(editSlot.location),
         status: editSlot.status,
       });
       setEditSlot(null);
       setErrors({ api: '' });
-      const { data, pagination: pag } = await getParkingSlots({
-        page: pagination.page,
-        limit: pagination.limit,
-        search,
-      });
-      setSlots(data || []);
-      setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+      fetchSlots(search);
+      toast.success('Slot updated successfully');
     } catch (error) {
       setErrors({ api: error.response?.data?.error || 'Failed to update slot' });
+      toast.error(error.response?.data?.error || 'Failed to update slot');
     }
   };
 
@@ -92,15 +105,11 @@ export default function ParkingSlots() {
       try {
         await deleteParkingSlot(id);
         setErrors({ api: '' });
-        const { data, pagination: pag } = await getParkingSlots({
-          page: pagination.page,
-          limit: pagination.limit,
-          search,
-        });
-        setSlots(data || []);
-        setPagination(pag || { page: 1, limit: 10, total: 0, pages: 1 });
+        fetchSlots(search);
+        toast.success('Slot deleted successfully');
       } catch (error) {
         setErrors({ api: error.response?.data?.error || 'Failed to delete slot' });
+        toast.error(error.response?.data?.error || 'Failed to delete slot');
       }
     }
   };
@@ -108,6 +117,7 @@ export default function ParkingSlots() {
   const addSlotForm = () => {
     setSlotForm([...slotForm, { slotNumber: '', size: 'small', vehicleType: 'car', location: '' }]);
   };
+
   const StatusBadge = ({ status }) => {
     switch(status) {
       case 'available':
@@ -135,7 +145,6 @@ export default function ParkingSlots() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header Section */}
         <div className="mb-8 border-b border-gray-200 pb-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div className="mb-4 sm:mb-0">
@@ -146,7 +155,7 @@ export default function ParkingSlots() {
                 View and manage all parking slots
               </p>
             </div>
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full sm:w-64 flex items-center">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <FaSearch className="text-gray-400" />
               </div>
@@ -154,16 +163,23 @@ export default function ParkingSlots() {
                 type="text"
                 placeholder="Search slots..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-white shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                onChange={handleSearch}
+                className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md bg-white shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
               />
+              {search && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-0 inset-y-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                >
+                  <FaTimes />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         <ErrorMessage message={errors.api} />
 
-        {/* Bulk Create Form */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200 mb-8">
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Create Multiple Slots</h3>
@@ -260,7 +276,7 @@ export default function ParkingSlots() {
               {slotForm.length > 0 && (
                 <button
                   type="submit"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-500"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-amber-500 hover:bg-amber-600"
                 >
                   Create Slots
                 </button>
@@ -269,7 +285,6 @@ export default function ParkingSlots() {
           </form>
         </div>
 
-        {/* Slots Table */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200">
           <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Existing Parking Slots</h3>
@@ -345,7 +360,6 @@ export default function ParkingSlots() {
           )}
         </div>
 
-        {/* Pagination */}
         <div className="flex items-center justify-between mt-6 px-4">
           <div className="flex-1 flex justify-between sm:hidden">
             <button
@@ -396,7 +410,6 @@ export default function ParkingSlots() {
           </div>
         </div>
 
-        {/* Edit Slot Modal */}
         {editSlot && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-xl overflow-hidden w-full max-w-md mx-4">
